@@ -177,7 +177,7 @@ def chat():
 
     except Exception as error:
         print("Groq error:", repr(error), flush=True)
-print("Groq error type:", type(error).__name__, flush=True)
+        print("Groq error type:", type(error).__name__, flush=True)
         return jsonify({
             "error": "HPPUSA AI could not complete the request right now. Please try again."
         }), 500
