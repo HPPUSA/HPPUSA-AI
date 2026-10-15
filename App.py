@@ -1,7 +1,7 @@
 
 import os
 from flask import Flask, request, jsonify, render_template_string
-
+from groq import Groq
 app = Flask(__name__)
 
 PAGE = """
@@ -133,47 +133,53 @@ def chat():
     if len(message) > 3000:
         return jsonify({"error": "Please keep your question under 3,000 characters."}), 400
 
-    text = message.lower()
+    api_key = os.environ.get("GROQ_API_KEY")
 
-    if any(word in text for word in ["maintenance", "checklist", "seasonal"]):
-        reply = (
-            "Let's build your home maintenance checklist:\n"
-            "1. Inspect smoke and carbon monoxide alarms.\n"
-            "2. Check HVAC filters and service dates.\n"
-            "3. Inspect for leaks around sinks, toilets, and windows.\n"
-            "4. Check gutters, roof condition, and exterior drainage.\n"
-            "5. Record each task, date, cost, and next due date.\n\n"
-            "Adjust these tasks to your property and equipment."
-        )
-    elif any(word in text for word in ["budget", "expense", "cost", "spending"]):
-        reply = (
-            "Let's organize your home budget:\n"
-            "1. List recurring bills and due dates.\n"
-            "2. Record repair and maintenance expenses.\n"
-            "3. Keep receipts and warranty information.\n"
-            "4. Plan a reserve for unexpected repairs.\n\n"
-            "Which home expenses would you like to organize first?"
-        )
-    elif any(word in text for word in ["warranty", "receipt", "document", "paperwork"]):
-        reply = (
-            "Create a home records folder with sections for:\n"
-            "1. Appliance receipts and warranties.\n"
-            "2. Contractor invoices and repair records.\n"
-            "3. Insurance and property documents.\n"
-            "4. Manuals, model numbers, and service dates.\n\n"
-            "Keep sensitive documents in a secure location."
-        )
-    else:
-        reply = (
-            "Thank you for contacting HPPUSA AI!\n\n"
-            "This is our starter assistant, so its responses are currently "
-            "limited to basic home-management guidance. The full AI model "
-            "has not been connected yet.\n\n"
-            "For the best help, tell me whether you need assistance with "
-            "maintenance, repairs, home expenses, or property records."
+    if not api_key:
+        return jsonify({
+            "error": "HPPUSA AI is not connected to its AI service yet."
+        }), 500
+
+    try:
+        client = Groq(api_key=api_key)
+
+        completion = client.chat.completions.create(
+            model="openai/gpt-oss-120b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are HPPUSA AI, a friendly and practical home "
+                        "management assistant. Help homeowners with maintenance, "
+                        "repairs, budgeting, warranties, property records, "
+                        "organization, and planning. Give clear step-by-step "
+                        "answers that are easy for a homeowner to understand. "
+                        "When a question involves safety, electrical work, "
+                        "plumbing, structural issues, or other potentially "
+                        "dangerous work, recommend using a qualified professional "
+                        "when appropriate. Do not claim to be a licensed contractor "
+                        "or professional. Keep answers useful and reasonably concise."
+                    )
+                },
+                {
+                    "role": "user",
+                    "content": message
+                }
+            ],
+            temperature=0.6,
+            max_completion_tokens=2048,
+            stream=False
         )
 
-    return jsonify({"reply": reply})
+        reply = completion.choices[0].message.content
+
+        return jsonify({"reply": reply})
+
+    except Exception as error:
+        print("Groq error:", error)
+        return jsonify({
+            "error": "HPPUSA AI could not complete the request right now. Please try again."
+        }), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
