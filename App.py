@@ -178,10 +178,10 @@ def chat():
     except Exception as error:
         print("Groq error:", repr(error), flush=True)
         print("Groq error type:", type(error).__name__, flush=True)
-        return jsonify({
-            "error": "HPPUSA AI could not complete the request right now. Please try again."
-        }), 500
+        print("Groq error cause:", repr(error.__cause__), flush=True)
+        return jsonify({"error": "HPPUSA AI could not complete the request right now. Please try again."}), 500
 
+    
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
