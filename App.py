@@ -71,12 +71,19 @@ footer { text-align: center; color: #68758a; padding: 20px; }
 </main>
 <script>
 function formatReply(text) {
-  const cleaned = text
+  let cleaned = text
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'");
+
+  cleaned = cleaned
+    .split('\\\\&').join('&')
+    .split('\\\\>').join('>')
+    .split('\\\\#').join('#')
+    .split('\\\\<br\\\\>').join('<br>')
+    .split('\\\\<br>').join('<br>');
 
   const lines = cleaned.split('\\n');
   let html = '';
@@ -96,10 +103,15 @@ function formatReply(text) {
   function formatInline(value) {
     let result = escapeHTML(value);
 
-    result = result.replace(/\\?&lt;br\s*\/?&gt;/gi, '<br>');
+    result = result.replace(/&lt;br\\s*\\/?&gt;/gi, '<br>');
+    result = result.replace(/\\\\&amp;/g, '&amp;');
+    result = result.replace(/\\\\&gt;/g, '&gt;');
+    result = result.replace(/\\\\&lt;/g, '&lt;');
+    result = result.replace(/\\\\#/g, '#');
+    result = result.replace(/\\\\>/g, '>');
 
-    result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-    result = result.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    result = result.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
+    result = result.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
 
     return result;
   }
@@ -119,17 +131,14 @@ function formatReply(text) {
     }
 
     html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; margin:16px 0;">';
-
-    const headers = tableRows[0];
-
     html += '<thead><tr>';
-    for (const cell of headers) {
+
+    for (const cell of tableRows[0]) {
       html += '<th style="text-align:left; padding:10px; border:1px solid #d6dde8; background:#edf2f8;">' +
         formatInline(cell) + '</th>';
     }
-    html += '</tr></thead>';
 
-    html += '<tbody>';
+    html += '</tr></thead><tbody>';
 
     for (let i = 1; i < tableRows.length; i++) {
       html += '<tr>';
@@ -143,7 +152,6 @@ function formatReply(text) {
     }
 
     html += '</tbody></table></div>';
-
     tableRows = [];
   }
 
@@ -158,9 +166,7 @@ function formatReply(text) {
         .split('|')
         .map(cell => cell.trim());
 
-      const isSeparator = cells.every(cell => /^:?-{3,}:?$/.test(cell));
-
-      if (isSeparator) {
+      if (cells.every(cell => /^:?-{3,}:?$/.test(cell))) {
         continue;
       }
 
@@ -206,19 +212,14 @@ function formatReply(text) {
 
     closeList();
 
-    const heading3 = trimmed.match(/^###\\s+(.+)$/);
-    const heading2 = trimmed.match(/^##\\s+(.+)$/);
-    const heading1 = trimmed.match(/^#\\s+(.+)$/);
+    const heading = trimmed.match(/^(#{1,3})\\s+(.+)$/);
 
-    if (heading3) {
-      html += '<h3>' + formatInline(heading3[1]) + '</h3>';
-    } else if (heading2) {
-      html += '<h2>' + formatInline(heading2[1]) + '</h2>';
-    } else if (heading1) {
-      html += '<h2>' + formatInline(heading1[1]) + '</h2>';
+    if (heading) {
+      const level = heading[1].length;
+      const tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
+      html += '<' + tag + '>' + formatInline(heading[2]) + '</' + tag + '>';
     } else {
-      const withBreaks = formatInline(trimmed).replace(/&lt;br\\s*\\/?&gt;/gi, '<br>');
-      html += '<p>' + withBreaks + '</p>';
+      html += '<p>' + formatInline(trimmed) + '</p>';
     }
   }
 
