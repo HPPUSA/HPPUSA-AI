@@ -83,9 +83,9 @@ function formatReply(text) {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 
-  let html = DOMPurify.sanitize(marked.parse(cleaned));
+  cleaned = cleaned.replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>');
 
-  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+  const html = marked.parse(cleaned);
 
   return DOMPurify.sanitize(html);
 }
