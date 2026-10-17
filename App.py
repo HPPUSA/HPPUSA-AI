@@ -71,6 +71,18 @@ footer { text-align: center; color: #68758a; padding: 20px; }
 </main>
 <script>
 function formatReply(text) {
+  const cleaned = text
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+
+  const lines = cleaned.split('\\n');
+  let html = '';
+  let listOpen = false;
+  let listType = null;
+
   function escapeHTML(value) {
     return value
       .replace(/&/g, '&amp;')
@@ -80,46 +92,80 @@ function formatReply(text) {
       .replace(/'/g, '&#39;');
   }
 
-  const lines = escapeHTML(text).split('\\n');
-  const output = [];
-  let inList = false;
+  function formatInline(value) {
+    let result = escapeHTML(value);
+
+    result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    result = result.replace(/\*(.+?)\*/g, '<em>$1</em>');
+
+    return result;
+  }
 
   for (const line of lines) {
     const trimmed = line.trim();
-    const item = trimmed.match(/^(?:[-*•]|\d+\.)\s+(.+)$/);
 
-    if (item) {
-      if (!inList) {
-        output.push('<ul>');
-        inList = true;
+    if (!trimmed) {
+      if (listOpen) {
+        html += listType === 'ol' ? '</ol>' : '</ul>';
+        listOpen = false;
+        listType = null;
       }
-      output.push('<li>' + item[1] + '</li>');
       continue;
     }
 
-    if (inList) {
-      output.push('</ul>');
-      inList = false;
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    const bullet = trimmed.match(/^[-*•]\s+(.+)$/);
+
+    if (numbered) {
+      if (!listOpen || listType !== 'ol') {
+        if (listOpen) {
+          html += listType === 'ol' ? '</ol>' : '</ul>';
+        }
+        html += '<ol>';
+        listOpen = true;
+        listType = 'ol';
+      }
+
+      html += '<li>' + formatInline(numbered[1]) + '</li>';
+      continue;
     }
 
-    if (!trimmed) {
-      output.push('');
-    } else if (trimmed.startsWith('### ')) {
-      output.push('<h3>' + trimmed.slice(4) + '</h3>');
+    if (bullet) {
+      if (!listOpen || listType !== 'ul') {
+        if (listOpen) {
+          html += listType === 'ol' ? '</ol>' : '</ul>';
+        }
+        html += '<ul>';
+        listOpen = true;
+        listType = 'ul';
+      }
+
+      html += '<li>' + formatInline(bullet[1]) + '</li>';
+      continue;
+    }
+
+    if (listOpen) {
+      html += listType === 'ol' ? '</ol>' : '</ul>';
+      listOpen = false;
+      listType = null;
+    }
+
+    if (trimmed.startsWith('### ')) {
+      html += '<h3>' + formatInline(trimmed.slice(4)) + '</h3>';
     } else if (trimmed.startsWith('## ')) {
-      output.push('<h2>' + trimmed.slice(3) + '</h2>');
+      html += '<h2>' + formatInline(trimmed.slice(3)) + '</h2>';
     } else if (trimmed.startsWith('# ')) {
-      output.push('<h2>' + trimmed.slice(2) + '</h2>');
+      html += '<h2>' + formatInline(trimmed.slice(2)) + '</h2>';
     } else {
-      output.push('<p>' + trimmed + '</p>');
+      html += '<p>' + formatInline(trimmed) + '</p>';
     }
   }
 
-  if (inList) output.push('</ul>');
+  if (listOpen) {
+    html += listType === 'ol' ? '</ol>' : '</ul>';
+  }
 
-  return output.join('')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+  return html;
 }
 
 async function sendMessage() {
