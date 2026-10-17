@@ -82,6 +82,7 @@ function formatReply(text) {
   let html = '';
   let listOpen = false;
   let listType = null;
+  let tableRows = [];
 
   function escapeHTML(value) {
     return value
@@ -101,26 +102,85 @@ function formatReply(text) {
     return result;
   }
 
+  function closeList() {
+    if (listOpen) {
+      html += listType === 'ol' ? '</ol>' : '</ul>';
+      listOpen = false;
+      listType = null;
+    }
+  }
+
+  function renderTable() {
+    if (tableRows.length < 2) {
+      tableRows = [];
+      return;
+    }
+
+    html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; margin:16px 0;">';
+
+    const headers = tableRows[0];
+
+    html += '<thead><tr>';
+    for (const cell of headers) {
+      html += '<th style="text-align:left; padding:10px; border:1px solid #d6dde8; background:#edf2f8;">' +
+        formatInline(cell) + '</th>';
+    }
+    html += '</tr></thead>';
+
+    html += '<tbody>';
+
+    for (let i = 1; i < tableRows.length; i++) {
+      html += '<tr>';
+
+      for (const cell of tableRows[i]) {
+        html += '<td style="vertical-align:top; padding:10px; border:1px solid #d6dde8;">' +
+          formatInline(cell) + '</td>';
+      }
+
+      html += '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+
+    tableRows = [];
+  }
+
   for (const line of lines) {
     const trimmed = line.trim();
 
-    if (!trimmed) {
-      if (listOpen) {
-        html += listType === 'ol' ? '</ol>' : '</ul>';
-        listOpen = false;
-        listType = null;
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      closeList();
+
+      const cells = trimmed
+        .slice(1, -1)
+        .split('|')
+        .map(cell => cell.trim());
+
+      const isSeparator = cells.every(cell => /^:?-{3,}:?$/.test(cell));
+
+      if (isSeparator) {
+        continue;
       }
+
+      tableRows.push(cells);
       continue;
     }
 
-    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
-    const bullet = trimmed.match(/^[-*•]\s+(.+)$/);
+    if (tableRows.length > 0) {
+      renderTable();
+    }
+
+    if (!trimmed || /^-{3,}$/.test(trimmed)) {
+      closeList();
+      continue;
+    }
+
+    const numbered = trimmed.match(/^\\d+\\.\\s+(.+)$/);
+    const bullet = trimmed.match(/^[-*•]\\s+(.+)$/);
 
     if (numbered) {
       if (!listOpen || listType !== 'ol') {
-        if (listOpen) {
-          html += listType === 'ol' ? '</ol>' : '</ul>';
-        }
+        closeList();
         html += '<ol>';
         listOpen = true;
         listType = 'ol';
@@ -132,9 +192,7 @@ function formatReply(text) {
 
     if (bullet) {
       if (!listOpen || listType !== 'ul') {
-        if (listOpen) {
-          html += listType === 'ol' ? '</ol>' : '</ul>';
-        }
+        closeList();
         html += '<ul>';
         listOpen = true;
         listType = 'ul';
@@ -144,30 +202,32 @@ function formatReply(text) {
       continue;
     }
 
-    if (listOpen) {
-      html += listType === 'ol' ? '</ol>' : '</ul>';
-      listOpen = false;
-      listType = null;
-    }
+    closeList();
 
-    if (trimmed.startsWith('### ')) {
-      html += '<h3>' + formatInline(trimmed.slice(4)) + '</h3>';
-    } else if (trimmed.startsWith('## ')) {
-      html += '<h2>' + formatInline(trimmed.slice(3)) + '</h2>';
-    } else if (trimmed.startsWith('# ')) {
-      html += '<h2>' + formatInline(trimmed.slice(2)) + '</h2>';
+    const heading3 = trimmed.match(/^###\\s+(.+)$/);
+    const heading2 = trimmed.match(/^##\\s+(.+)$/);
+    const heading1 = trimmed.match(/^#\\s+(.+)$/);
+
+    if (heading3) {
+      html += '<h3>' + formatInline(heading3[1]) + '</h3>';
+    } else if (heading2) {
+      html += '<h2>' + formatInline(heading2[1]) + '</h2>';
+    } else if (heading1) {
+      html += '<h2>' + formatInline(heading1[1]) + '</h2>';
     } else {
-      html += '<p>' + formatInline(trimmed) + '</p>';
+      const withBreaks = formatInline(trimmed).replace(/&lt;br\\s*\\/?&gt;/gi, '<br>');
+      html += '<p>' + withBreaks + '</p>';
     }
   }
 
-  if (listOpen) {
-    html += listType === 'ol' ? '</ol>' : '</ul>';
+  if (tableRows.length > 0) {
+    renderTable();
   }
+
+  closeList();
 
   return html;
 }
-
 async function sendMessage() {
   const input = document.getElementById('question');
   const chat = document.getElementById('chat');
