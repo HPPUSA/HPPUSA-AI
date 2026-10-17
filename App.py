@@ -79,17 +79,28 @@ marked.setOptions({
 
 function formatReply(text) {
   const cleaned = String(text)
-    .replace(/&#x20;|&#32;/gi, ' ')
-    .replace(/&#91;/gi, '[')
-    .replace(/&#93;/gi, ']');
+    .replace(/&amp;#x20;|&#x20;|&#32;/gi, ' ')
+    .replace(/&amp;#91;|&#91;/gi, '[')
+    .replace(/&amp;#93;|&#93;/gi, ']');
 
   const html = marked.parse(cleaned);
   const safeHtml = DOMPurify.sanitize(html);
 
-  return safeHtml
-    .replace(/&#x20;|&#32;/gi, ' ')
-    .replace(/&#91;/gi, '[')
-    .replace(/&#93;/gi, ']');
+  const container = document.createElement('div');
+  container.innerHTML = safeHtml;
+
+  container.querySelectorAll('*').forEach((element) => {
+    element.childNodes.forEach((node) => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        node.textContent = node.textContent
+          .replace(/&#x20;|&#32;/gi, ' ')
+          .replace(/&#91;/gi, '[')
+          .replace(/&#93;/gi, ']');
+      }
+    });
+  });
+
+  return DOMPurify.sanitize(container.innerHTML);
 }
 async function sendMessage() {
   const input = document.getElementById('question');
