@@ -79,7 +79,7 @@ marked.setOptions({
 
 function formatReply(text) {
   const cleaned = String(text)
-    .replace(/\\(?=\s*\n)/g, '')
+    .replace(/\\\\(?=\\s*\\n)/g, '')
     .replace(/&amp;#x20;|&#x20;|&#32;/gi, ' ')
     .replace(/&amp;#91;|&#91;/gi, '[')
     .replace(/&amp;#93;|&#93;/gi, ']');
