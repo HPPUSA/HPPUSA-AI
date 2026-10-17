@@ -78,15 +78,8 @@ marked.setOptions({
 });
 
 function formatReply(text) {
-  let cleaned = String(text)
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
-
-  cleaned = cleaned.replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>');
-
+  const cleaned = String(text);
   const html = marked.parse(cleaned);
-
   return DOMPurify.sanitize(html);
 }
 async function sendMessage() {
