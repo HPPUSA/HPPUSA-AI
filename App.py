@@ -96,6 +96,8 @@ function formatReply(text) {
   function formatInline(value) {
     let result = escapeHTML(value);
 
+    result = result.replace(/\\?&lt;br\s*\/?&gt;/gi, '<br>');
+
     result = result.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     result = result.replace(/\*(.+?)\*/g, '<em>$1</em>');
 
