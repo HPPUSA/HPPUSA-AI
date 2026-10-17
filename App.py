@@ -208,7 +208,6 @@ def chat():
                         "professional when appropriate. Do not claim to be a licensed contractor or "
                         "other licensed professional. Be respectful, patient, and encouraging. Help "
                         "homeowners take one manageable step at a time. "
-"
                     )
                 },
                 {
