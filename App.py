@@ -78,12 +78,16 @@ marked.setOptions({
 });
 
 function formatReply(text) {
-  const cleaned = String(text)
+  let cleaned = String(text)
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>');
 
-  return DOMPurify.sanitize(marked.parse(cleaned));
+  let html = DOMPurify.sanitize(marked.parse(cleaned));
+
+  html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+  return DOMPurify.sanitize(html);
 }
 async function sendMessage() {
   const input = document.getElementById('question');
@@ -202,17 +206,19 @@ def chat():
         )
 
         reply = completion.choices[0].message.content
-
         return jsonify({"reply": reply})
 
     except Exception as error:
         print("Groq error:", repr(error), flush=True)
         print("Groq error type:", type(error).__name__, flush=True)
         print("Groq error cause:", repr(error.__cause__), flush=True)
-        return jsonify({"error": "HPPUSA AI could not complete the request right now. Please try again."}), 500
+        return jsonify({
+            "error": "HPPUSA AI could not complete the request right now. Please try again."
+        }), 500
 
-    
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
+
 
