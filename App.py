@@ -78,7 +78,12 @@ marked.setOptions({
 });
 
 function formatReply(text) {
-  const cleaned = String(text);
+  const cleaned = String(text)
+    .replace(/&#x20;/gi, ' ')
+    .replace(/&#32;/gi, ' ')
+    .replace(/&#91;/gi, '[')
+    .replace(/&#93;/gi, ']');
+
   const html = marked.parse(cleaned);
   return DOMPurify.sanitize(html);
 }
