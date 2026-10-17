@@ -80,7 +80,7 @@ function formatReply(text) {
       .replace(/'/g, '&#39;');
   }
 
-  const lines = escapeHTML(text).split('\n');
+  const lines = escapeHTML(text).split('\\n');
   const output = [];
   let inList = false;
 
