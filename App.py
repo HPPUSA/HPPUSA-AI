@@ -69,167 +69,21 @@ footer { text-align: center; color: #68758a; padding: 20px; }
     <p id="status" role="status"></p>
   </div>
 </main>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
 <script>
+marked.setOptions({
+  gfm: true,
+  breaks: true
+});
+
 function formatReply(text) {
-  let cleaned = text
+  const cleaned = String(text)
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
+    .replace(/&gt;/g, '>');
 
-  cleaned = cleaned
-    .split('\\\\&').join('&')
-    .split('\\\\>').join('>')
-    .split('\\\\#').join('#')
-    .split('\\\\<br\\\\>').join('<br>')
-    .split('\\\\<br>').join('<br>');
-
-  const lines = cleaned.split('\\n');
-  let html = '';
-  let listOpen = false;
-  let listType = null;
-  let tableRows = [];
-
-  function escapeHTML(value) {
-    return value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  function formatInline(value) {
-    let result = escapeHTML(value);
-
-    result = result.replace(/&lt;br\\s*\\/?&gt;/gi, '<br>');
-    result = result.replace(/\\\\&amp;/g, '&amp;');
-    result = result.replace(/\\\\&gt;/g, '&gt;');
-    result = result.replace(/\\\\&lt;/g, '&lt;');
-    result = result.replace(/\\\\#/g, '#');
-    result = result.replace(/\\\\>/g, '>');
-
-    result = result.replace(/\\*\\*(.+?)\\*\\*/g, '<strong>$1</strong>');
-    result = result.replace(/\\*(.+?)\\*/g, '<em>$1</em>');
-
-    return result;
-  }
-
-  function closeList() {
-    if (listOpen) {
-      html += listType === 'ol' ? '</ol>' : '</ul>';
-      listOpen = false;
-      listType = null;
-    }
-  }
-
-  function renderTable() {
-    if (tableRows.length < 2) {
-      tableRows = [];
-      return;
-    }
-
-    html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; margin:16px 0;">';
-    html += '<thead><tr>';
-
-    for (const cell of tableRows[0]) {
-      html += '<th style="text-align:left; padding:10px; border:1px solid #d6dde8; background:#edf2f8;">' +
-        formatInline(cell) + '</th>';
-    }
-
-    html += '</tr></thead><tbody>';
-
-    for (let i = 1; i < tableRows.length; i++) {
-      html += '<tr>';
-
-      for (const cell of tableRows[i]) {
-        html += '<td style="vertical-align:top; padding:10px; border:1px solid #d6dde8;">' +
-          formatInline(cell) + '</td>';
-      }
-
-      html += '</tr>';
-    }
-
-    html += '</tbody></table></div>';
-    tableRows = [];
-  }
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-
-    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
-      closeList();
-
-      const cells = trimmed
-        .slice(1, -1)
-        .split('|')
-        .map(cell => cell.trim());
-
-      if (cells.every(cell => /^:?-{3,}:?$/.test(cell))) {
-        continue;
-      }
-
-      tableRows.push(cells);
-      continue;
-    }
-
-    if (tableRows.length > 0) {
-      renderTable();
-    }
-
-    if (!trimmed || /^-{3,}$/.test(trimmed)) {
-      closeList();
-      continue;
-    }
-
-    const numbered = trimmed.match(/^\\d+\\.\\s+(.+)$/);
-    const bullet = trimmed.match(/^[-*•]\\s+(.+)$/);
-
-    if (numbered) {
-      if (!listOpen || listType !== 'ol') {
-        closeList();
-        html += '<ol>';
-        listOpen = true;
-        listType = 'ol';
-      }
-
-      html += '<li>' + formatInline(numbered[1]) + '</li>';
-      continue;
-    }
-
-    if (bullet) {
-      if (!listOpen || listType !== 'ul') {
-        closeList();
-        html += '<ul>';
-        listOpen = true;
-        listType = 'ul';
-      }
-
-      html += '<li>' + formatInline(bullet[1]) + '</li>';
-      continue;
-    }
-
-    closeList();
-
-    const heading = trimmed.match(/^(#{1,3})\\s+(.+)$/);
-
-    if (heading) {
-      const level = heading[1].length;
-      const tag = level === 1 ? 'h2' : level === 2 ? 'h3' : 'h4';
-      html += '<' + tag + '>' + formatInline(heading[2]) + '</' + tag + '>';
-    } else {
-      html += '<p>' + formatInline(trimmed) + '</p>';
-    }
-  }
-
-  if (tableRows.length > 0) {
-    renderTable();
-  }
-
-  closeList();
-
-  return html;
+  return DOMPurify.sanitize(marked.parse(cleaned));
 }
 async function sendMessage() {
   const input = document.getElementById('question');
