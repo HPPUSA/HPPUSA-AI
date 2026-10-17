@@ -69,50 +69,117 @@ footer { text-align: center; color: #68758a; padding: 20px; }
     <p id="status" role="status"></p>
   </div>
 </main>
-<footer>HPPUSA · Human ideas. AI-powered tools. Real value.</footer>
 <script>
+function formatReply(text) {
+  function escapeHTML(value) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  const lines = escapeHTML(text).split('\n');
+  const output = [];
+  let inList = false;
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    const item = trimmed.match(/^(?:[-*•]|\d+\.)\s+(.+)$/);
+
+    if (item) {
+      if (!inList) {
+        output.push('<ul>');
+        inList = true;
+      }
+      output.push('<li>' + item[1] + '</li>');
+      continue;
+    }
+
+    if (inList) {
+      output.push('</ul>');
+      inList = false;
+    }
+
+    if (!trimmed) {
+      output.push('');
+    } else if (trimmed.startsWith('### ')) {
+      output.push('<h3>' + trimmed.slice(4) + '</h3>');
+    } else if (trimmed.startsWith('## ')) {
+      output.push('<h2>' + trimmed.slice(3) + '</h2>');
+    } else if (trimmed.startsWith('# ')) {
+      output.push('<h2>' + trimmed.slice(2) + '</h2>');
+    } else {
+      output.push('<p>' + trimmed + '</p>');
+    }
+  }
+
+  if (inList) output.push('</ul>');
+
+  return output.join('')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g, '<em>$1</em>');
+}
+
 async function sendMessage() {
   const input = document.getElementById('question');
   const chat = document.getElementById('chat');
   const status = document.getElementById('status');
   const button = document.getElementById('send');
   const question = input.value.trim();
+
   if (!question) {
     status.textContent = 'Please enter a question first.';
     return;
   }
+
   const userMessage = document.createElement('div');
   userMessage.className = 'message user';
   userMessage.textContent = question;
   chat.appendChild(userMessage);
+
   input.value = '';
   button.disabled = true;
   status.textContent = 'Preparing your response...';
+
   try {
     const response = await fetch('/chat', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({message: question})
     });
+
     const data = await response.json();
     const reply = document.createElement('div');
     reply.className = 'message bot';
-    reply.textContent = data.reply || data.error || 'Please try again.';
+
+    const replyText =
+      data.reply || data.error || 'Please try again.';
+
+    reply.innerHTML = formatReply(replyText);
     chat.appendChild(reply);
+
   } catch (error) {
     status.textContent = 'Could not connect. Please try again.';
   } finally {
     button.disabled = false;
-    status.textContent = '';
+    if (!status.textContent.startsWith('Could not connect')) {
+      status.textContent = '';
+    }
     chat.scrollTop = chat.scrollHeight;
   }
 }
-document.getElementById('question').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault();
-    sendMessage();
+
+document.getElementById('question').addEventListener(
+  'keydown',
+  function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
   }
-});
+);
 </script>
 </body>
 </html>
