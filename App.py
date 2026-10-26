@@ -254,6 +254,8 @@ def chat():
                         "retrieve tools if doing so could expose them to the wet area. "
                         "Do not recommend buckets, towels, or mops in a potentially "
                         "energized area. Keep the homeowner in a dry, safe location. "
+                        "Do not suggest placing cardboard, barriers, or other objects "
+                        "near the wet area to contain water or redirect foot traffic. "
                         "If there are sparks, smoke, fire, or possible electric shock, "
                         "move to safety and call emergency services. For other electrical "
                         "hazards, contact the electric utility or a qualified electrician, "
