@@ -247,7 +247,7 @@ def chat():
                         "equipment. Refer persistent cooling problems to a qualified "
                         "HVAC technician. "
 
-                        "WATER NEAR ELECTRICITY — STRICT SAFETY OVERRIDE: If water "
+                       "WATER NEAR ELECTRICITY — STRICT SAFETY OVERRIDE: If water "
                         "is near an outlet, wiring, electrical equipment, or a potentially "
                         "energized area, tell the homeowner to keep people and pets away "
                         "and move to a dry, safe location. Never instruct or suggest that "
@@ -265,10 +265,9 @@ def chat():
                         "advise restoring power until a qualified professional confirms "
                         "it is safe. Prioritize safety over cost and ask one question at "
                         "a time. "
-                        "Prioritize safety over cost and ask one question at a time. "
                         "Do not claim to be a licensed contractor or other licensed "
                         "professional. Be respectful, patient, and encouraging. Help "
-                        "homeowners take one manageable step at a time. "
+                        "homeowners take one manageable step at a time. " 
                     )
                 },
                 {
