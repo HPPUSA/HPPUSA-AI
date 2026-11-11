@@ -35,3 +35,47 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: python -m pytest -q
+
+      - name: Smoke-test Gunicorn over localhost
+        env:
+          GROQ_API_KEY: ""
+        run: |
+          set -e
+          gunicorn --bind 127.0.0.1:8765 --workers 1 --timeout 30 App:app &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+          python - <<'PY'
+          import json
+          import time
+          from urllib.error import HTTPError, URLError
+          from urllib.request import Request, urlopen
+
+          base = "http://127.0.0.1:8765"
+          for attempt in range(30):
+              try:
+                  with urlopen(base + "/", timeout=1) as response:
+                      assert response.status == 200
+                      assert b"HPPUSA AI" in response.read()
+                  break
+              except (URLError, TimeoutError):
+                  if attempt == 29:
+                      raise
+                  time.sleep(0.5)
+          else:
+              raise RuntimeError("Gunicorn did not become ready")
+
+          body = json.dumps({"message": "smoke test"}).encode("utf-8")
+          request = Request(
+              base + "/chat",
+              data=body,
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          try:
+              urlopen(request, timeout=3)
+              raise AssertionError("Expected safe missing-key response")
+          except HTTPError as error:
+              assert error.code == 500
+              payload = json.loads(error.read())
+              assert "not connected" in payload["error"].lower()
+          PY
