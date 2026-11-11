@@ -200,3 +200,32 @@ def test_rate_limit_uses_cloudflare_client_ip_not_forwarded_for(monkeypatch):
         environ_base={"REMOTE_ADDR": "10.0.0.1"},
     )
     assert separate_client.status_code == 500
+
+
+def test_provider_timeout_returns_safe_error_without_exposing_details(monkeypatch, caplog):
+    class _TimeoutGroq:
+        def __init__(self, api_key, **kwargs):
+            self.chat = self
+
+        @property
+        def completions(self):
+            return self
+
+        def create(self, **kwargs):
+            raise TimeoutError("provider-timeout-internal-detail")
+
+    monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
+    monkeypatch.setattr(App, "Groq", _TimeoutGroq)
+    caplog.set_level(logging.ERROR)
+
+    response = App.app.test_client().post(
+        "/chat", json={"message": "Please help me plan home maintenance"}
+    )
+
+    assert response.status_code == 500
+    body = response.get_data(as_text=True)
+    assert "could not complete the request" in body.lower()
+    assert "provider-timeout-internal-detail" not in body
+    assert "test-key-not-real" not in body
+    assert response.get_json()["request_id"]
+    assert "provider-timeout-internal-detail" not in caplog.text
