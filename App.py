@@ -21,46 +21,65 @@ _request_history = OrderedDict()
 _request_history_lock = Lock()
 
 
+def _normalize_rate_limit_client_key(client_key):
+    """Return one canonical IP address, or None for an untrusted identity."""
+    if not isinstance(client_key, str):
+        return None
+    try:
+        return ipaddress.ip_address(client_key.strip()).compressed
+    except ValueError:
+        return None
+
+
 def _get_rate_limit_client_key():
     # Render documents Cloudflare as the ingress for public web-service traffic.
     # Its Cloudflare integration supplies CF-Connecting-IP to the origin.
     # Do not use X-Forwarded-For: caller-provided values can be retained in its chain.
     # A local Flask test client can set CF-Connecting-IP itself; that does not
     # model or validate the Cloudflare edge trust boundary.
-    forwarded_ip = request.headers.get("CF-Connecting-IP")
-    if forwarded_ip:
-        try:
-            return ipaddress.ip_address(forwarded_ip.strip()).compressed
-        except ValueError:
-            # Reject malformed or chained values and fail back to the socket peer.
-            pass
-
-    # Fail closed: do not substitute the proxy socket address or an XFF value.
-    # Without a valid edge-supplied client identity, rate limiting is unreliable.
-    return None
+    return _normalize_rate_limit_client_key(
+        request.headers.get("CF-Connecting-IP")
+    )
 
 
 def _chat_rate_limit_exceeded(client_key=None):
     if client_key is None:
         client_key = _get_rate_limit_client_key()
-    # Defense in depth: an absent/invalid identity must never be treated as allowed.
+    # Validate even explicitly supplied keys: callers cannot bypass the
+    # identity boundary by passing an arbitrary string or non-string value.
+    client_key = _normalize_rate_limit_client_key(client_key)
     if client_key is None:
         return True
+
     now = time.monotonic()
+    cutoff = now - RATE_LIMIT_WINDOW_SECONDS
 
     with _request_history_lock:
         history = _request_history.get(client_key)
         if history is None:
             if len(_request_history) >= MAX_TRACKED_CLIENTS:
-                _request_history.popitem(last=False)
+                # Reclaim only expired records. Never evict an active client's
+                # history and silently grant that identity a fresh request bucket.
+                expired_keys = []
+                for tracked_key, tracked_history in _request_history.items():
+                    while tracked_history and tracked_history[0] <= cutoff:
+                        tracked_history.popleft()
+                    if not tracked_history:
+                        expired_keys.append(tracked_key)
+                for expired_key in expired_keys:
+                    del _request_history[expired_key]
+
+                # Preserve existing protections when capacity is still full.
+                # New identities are temporarily blocked until a slot expires.
+                if len(_request_history) >= MAX_TRACKED_CLIENTS:
+                    return True
+
             history = deque()
             _request_history[client_key] = history
         else:
             _request_history.move_to_end(client_key)
-
-        cutoff = now - RATE_LIMIT_WINDOW_SECONDS
-        while history and history[0] <= cutoff:
-            history.popleft()
+            while history and history[0] <= cutoff:
+                history.popleft()
 
         if len(history) >= RATE_LIMIT_REQUESTS:
             return True
