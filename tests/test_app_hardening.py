@@ -436,3 +436,21 @@ def test_chat_fails_closed_when_cloudflare_ip_header_is_invalid():
     )
     assert response.status_code == 503
     assert "cannot verify the request source" in response.get_json()["error"]
+
+
+
+def test_rate_limit_rejects_scoped_ipv6_explicit_client_keys():
+    App._request_history.clear()
+    for scoped_key in ("fe80::1%eth0", "fe80::1%3", "2001:db8::1%en0"):
+        assert App._normalize_rate_limit_client_key(scoped_key) is None
+        assert App._chat_rate_limit_exceeded(scoped_key) is True
+    assert not App._request_history
+
+
+def test_scoped_ipv6_cloudflare_header_has_no_trusted_client_key():
+    with App.app.test_request_context(
+        "/chat", headers={"CF-Connecting-IP": "fe80::1%eth0"}
+    ):
+        assert App._get_rate_limit_client_key() is None
+        assert App._chat_rate_limit_exceeded() is True
+    assert not App._request_history
