@@ -274,7 +274,11 @@ def test_rate_limit_concurrent_requests_never_exceed_ten_allowed(monkeypatch):
 
 
 def test_rate_limit_identity_can_be_changed_by_spoofed_cloudflare_header(monkeypatch):
-    """Document current behavior: Flask accepts caller-supplied CF header in tests."""
+    """A local Flask test client bypasses Cloudflare and can set this header.
+
+    This demonstrates the test-server boundary only; it is not evidence that
+    a public Render caller can override Cloudflare's edge-supplied header.
+    """
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = App.app.test_client()
 
@@ -328,3 +332,34 @@ def test_expired_client_history_is_not_swept_for_inactive_clients(monkeypatch):
     assert "192.0.2.61" in App._request_history
     # Only the current client's history is pruned; inactive keys remain stale.\n    assert len(App._request_history["192.0.2.61"]) == 1
 
+
+
+
+def test_invalid_cloudflare_ip_header_falls_back_to_socket_peer():
+    with App.app.test_request_context(
+        "/chat",
+        headers={
+            "CF-Connecting-IP": "not-an-ip, 198.51.100.1",
+            "X-Forwarded-For": "203.0.113.99",
+        },
+        environ_base={"REMOTE_ADDR": "192.0.2.70"},
+    ):
+        assert App._get_rate_limit_client_key() == "192.0.2.70"
+
+
+def test_missing_cloudflare_ip_header_uses_socket_peer():
+    with App.app.test_request_context(
+        "/chat",
+        headers={"X-Forwarded-For": "203.0.113.99"},
+        environ_base={"REMOTE_ADDR": "192.0.2.71"},
+    ):
+        assert App._get_rate_limit_client_key() == "192.0.2.71"
+
+
+def test_cloudflare_ipv6_address_is_canonicalized():
+    with App.app.test_request_context(
+        "/chat",
+        headers={"CF-Connecting-IP": "2001:0db8:0000:0000:0000:0000:0000:0001"},
+        environ_base={"REMOTE_ADDR": "10.0.0.1"},
+    ):
+        assert App._get_rate_limit_client_key() == "2001:db8::1"
