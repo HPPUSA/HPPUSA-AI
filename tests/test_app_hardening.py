@@ -29,8 +29,10 @@ class _FakeChat:
 class _FakeGroq:
     last_instance = None
 
-    def __init__(self, api_key):
+    def __init__(self, api_key, timeout, max_retries):
         self.api_key = api_key
+        self.timeout = timeout
+        self.max_retries = max_retries
         self.chat = _FakeChat()
         _FakeGroq.last_instance = self
 
@@ -55,6 +57,8 @@ def test_valid_chat_uses_mocked_provider(monkeypatch):
 
     assert response.status_code == 200
     assert response.get_json()["reply"] == "A safe, mocked HPPUSA response."
+    assert _FakeGroq.last_instance.timeout == 25.0
+    assert _FakeGroq.last_instance.max_retries == 0
     sent_messages = _FakeGroq.last_instance.chat.completions.kwargs["messages"]
     assert "WATER NEAR ELECTRICITY — STRICT SAFETY OVERRIDE" in sent_messages[0]["content"]
 
@@ -101,7 +105,7 @@ def test_missing_api_key_returns_safe_error(monkeypatch):
 
 def test_provider_failure_does_not_expose_exception_or_prompt(monkeypatch, caplog):
     class _ExplodingGroq:
-        def __init__(self, api_key):
+        def __init__(self, api_key, **kwargs):
             self.chat = self
 
         @property
