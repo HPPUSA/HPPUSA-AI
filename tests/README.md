@@ -21,7 +21,7 @@ python -m pytest -q
 
 If `py -3 --version` fails, install Python 3.11 or newer from python.org, then reopen PowerShell and retry.
 
-Expected success output ends with `13 passed` (current suite). If a test fails, copy the complete PowerShell output for review. Do not add a Groq API key or run the live service for this test.
+Expected success output ends with `14 passed` (current suite). If a test fails, copy the complete PowerShell output for review. Do not add a Groq API key or run the live service for this test.
 
 ## Scope
 
