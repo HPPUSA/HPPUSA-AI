@@ -29,10 +29,10 @@ class _FakeChat:
 class _FakeGroq:
     last_instance = None
 
-    def __init__(self, api_key, timeout, max_retries):
+    def __init__(self, api_key, **kwargs):
         self.api_key = api_key
-        self.timeout = timeout
-        self.max_retries = max_retries
+        self.timeout = kwargs.get("timeout")
+        self.max_retries = kwargs.get("max_retries")
         self.chat = _FakeChat()
         _FakeGroq.last_instance = self
 
