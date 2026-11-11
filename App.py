@@ -42,8 +42,11 @@ def _get_rate_limit_client_key():
     )
 
 
-def _chat_rate_limit_exceeded(client_key=None):
-    if client_key is None:
+_CLIENT_KEY_UNSET = object()
+
+
+def _chat_rate_limit_exceeded(client_key=_CLIENT_KEY_UNSET):
+    if client_key is _CLIENT_KEY_UNSET:
         client_key = _get_rate_limit_client_key()
     # Validate even explicitly supplied keys: callers cannot bypass the
     # identity boundary by passing an arbitrary string or non-string value.
