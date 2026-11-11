@@ -68,7 +68,10 @@ jobs:
           request = Request(
               base + "/chat",
               data=body,
-              headers={"Content-Type": "application/json"},
+              headers={
+              "Content-Type": "application/json",
+              "CF-Connecting-IP": "192.0.2.100",
+          },
               method="POST",
           )
           try:
