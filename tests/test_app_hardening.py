@@ -68,6 +68,30 @@ def test_blank_message_returns_400():
     assert response.status_code == 400
 
 
+def test_non_object_json_payload_returns_400():
+    client = App.app.test_client()
+    for payload in (["unexpected"], "unexpected", 7, True):
+        response = client.post("/chat", json=payload)
+        assert response.status_code == 400
+        assert "JSON object" in response.get_json()["error"]
+
+
+def test_non_string_message_returns_400():
+    client = App.app.test_client()
+    for value in (123, ["text"], {"text": "value"}):
+        response = client.post("/chat", json={"message": value})
+        assert response.status_code == 400
+        assert response.get_json()["error"] == "Please enter a question."
+
+
+def test_malformed_json_returns_400():
+    response = App.app.test_client().post(
+        "/chat", data="{not-json", content_type="application/json"
+    )
+    assert response.status_code == 400
+    assert "JSON object" in response.get_json()["error"]
+
+
 def test_message_over_3000_characters_returns_400():
     response = App.app.test_client().post("/chat", json={"message": "x" * 3001})
     assert response.status_code == 400
