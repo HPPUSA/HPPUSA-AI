@@ -117,8 +117,8 @@ footer { text-align: center; color: #68758a; padding: 20px; }
     <p id="status" role="status"></p>
   </div>
 </main>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@18.1.3/lib/marked.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js"></script>
 <script>
 marked.setOptions({
   gfm: true,
