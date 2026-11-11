@@ -226,9 +226,15 @@ def chat():
         response.headers["Retry-After"] = str(RATE_LIMIT_WINDOW_SECONDS)
         return response
 
-    data = request.get_json(silent=True) or {}
-    message = str(data.get("message", "")).strip()
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Please send your question as a JSON object."}), 400
 
+    raw_message = data.get("message")
+    if not isinstance(raw_message, str):
+        return jsonify({"error": "Please enter a question."}), 400
+
+    message = raw_message.strip()
     if not message:
         return jsonify({"error": "Please enter a question."}), 400
 
