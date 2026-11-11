@@ -129,26 +129,22 @@ def test_provider_failure_does_not_expose_exception_or_prompt(monkeypatch, caplo
     assert "private-customer-prompt" not in caplog.text
 
 
-def test_rate_limit_uses_cloudflare_client_ip_not_forwarded_for(monkeypatch):
+def test_rate_limit_cannot_be_bypassed_with_forwarded_headers(monkeypatch):
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = App.app.test_client()
     for index in range(10):
         response = client.post(
             "/chat",
             json={"message": "hello"},
-            headers={
-                "CF-Connecting-IP": "192.0.2.25",
-                "X-Forwarded-For": f"198.51.100.{index + 1}",
-            },
+            headers={"X-Forwarded-For": f"198.51.100.{index + 1}"},
+            environ_base={"REMOTE_ADDR": "192.0.2.25"},
         )
         assert response.status_code == 500
 
     blocked = client.post(
         "/chat",
         json={"message": "hello"},
-        headers={
-            "CF-Connecting-IP": "192.0.2.25",
-            "X-Forwarded-For": "203.0.113.77",
-        },
+        headers={"X-Forwarded-For": "203.0.113.77"},
+        environ_base={"REMOTE_ADDR": "192.0.2.25"},
     )
     assert blocked.status_code == 429
