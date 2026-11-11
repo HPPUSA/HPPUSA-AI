@@ -413,7 +413,7 @@ def test_cloudflare_ipv6_address_is_canonicalized():
 
 
 
-def test_chat_fails_closed_when_cloudflare_ip_header_is_missing():
+def test_chat_fails_closed_for_private_network_request_without_cloudflare_header():
     response = App.app.test_client().post(
         "/chat",
         json={"message": "hello"},
