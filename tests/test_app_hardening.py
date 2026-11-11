@@ -79,7 +79,8 @@ def test_oversized_request_body_returns_413():
     assert "error" in response.get_json()
 
 
-def test_rate_limit_returns_429_after_ten_requests():
+def test_rate_limit_returns_429_after_ten_requests(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = App.app.test_client()
     responses = [
         client.post("/chat", json={"message": "hello"}, environ_base={"REMOTE_ADDR": "192.0.2.10"})
@@ -128,7 +129,8 @@ def test_provider_failure_does_not_expose_exception_or_prompt(monkeypatch, caplo
     assert "private-customer-prompt" not in caplog.text
 
 
-def test_rate_limit_uses_cloudflare_client_ip_not_forwarded_for():
+def test_rate_limit_uses_cloudflare_client_ip_not_forwarded_for(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = App.app.test_client()
     for index in range(10):
         response = client.post(
