@@ -21,7 +21,7 @@ python -m pytest -q
 
 If `py -3 --version` fails, install Python 3.11 or newer from python.org, then reopen PowerShell and retry.
 
-Expected Python success output ends with `16 passed` (current Python suite). The suite now includes rate-limit expiry at the exact 60-second boundary and concurrent requests sharing one client address. The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
+Expected Python success output ends with `28 passed` (current Python suite). The suite covers rate-limit expiry at the exact 60-second boundary, concurrent requests sharing one client address, rejection of scoped IPv6 identities, and capacity handling. At capacity, expired client records are reclaimed without evicting active records. The reclamation scan can inspect up to 5,000 tracked identities while holding the process-local lock; this is a bounded but potentially contention-producing operation and should be revisited before higher-volume use. The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
 
 ```powershell
 npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 dompurify@3.4.17 marked@18.1.3
