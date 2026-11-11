@@ -21,7 +21,9 @@ python -m pytest -q
 
 If `py -3 --version` fails, install Python 3.11 or newer from python.org, then reopen PowerShell and retry.
 
-Expected Python success output ends with `28 passed` (current Python suite). The suite covers rate-limit expiry at the exact 60-second boundary, concurrent requests sharing one client address, rejection of scoped IPv6 identities, and capacity handling. At capacity, expired client records are reclaimed without evicting active records. The reclamation scan can inspect up to 5,000 tracked identities while holding the process-local lock; this is a bounded but potentially contention-producing operation and should be revisited before higher-volume use. The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
+Expected Python success output ends with `28 passed` (current Python suite). The suite covers rate-limit expiry at the exact 60-second boundary, concurrent requests sharing one client address, rejection of scoped IPv6 identities, and capacity handling. At capacity, expired client records are reclaimed without evicting active records. The reclamation scan can inspect up to 5,000 tracked identities while holding the process-local lock; this is a bounded but potentially contention-producing operation and should be revisited before higher-volume use. Render confirms that private-network requests do not pass through Cloudflare. Because this Phase 1 implementation deliberately uses only `CF-Connecting-IP` for client identity, a private-network request to `/chat` without that header is rejected with HTTP 503. It does not fall back to `X-Forwarded-For` or the network peer address. This is intentional fail-closed behavior; private-network access to `/chat` is not supported by this rate-limiter design unless a separately authenticated identity mechanism is designed and reviewed.
+
+The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
 
 ```powershell
 npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 dompurify@3.4.17 marked@18.1.3
