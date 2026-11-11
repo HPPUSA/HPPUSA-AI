@@ -1,4 +1,5 @@
 
+import ipaddress
 import os
 import time
 from collections import OrderedDict, deque
@@ -20,11 +21,32 @@ _request_history = OrderedDict()
 _request_history_lock = Lock()
 
 
+def _get_rate_limit_client_key():
+    # Render documents Cloudflare as the ingress for public web-service traffic.
+    # Its Cloudflare integration supplies CF-Connecting-IP to the origin.
+    # Do not use X-Forwarded-For: caller-provided values can be retained in its chain.
+    # A local Flask test client can set CF-Connecting-IP itself; that does not
+    # model or validate the Cloudflare edge trust boundary.
+    forwarded_ip = request.headers.get("CF-Connecting-IP")
+    if forwarded_ip:
+        try:
+            return ipaddress.ip_address(forwarded_ip.strip()).compressed
+        except ValueError:
+            # Reject malformed or chained values and fail back to the socket peer.
+            pass
+
+    remote_ip = request.remote_addr
+    if remote_ip:
+        try:
+            return ipaddress.ip_address(remote_ip).compressed
+        except ValueError:
+            pass
+
+    return "unknown"
+
+
 def _chat_rate_limit_exceeded():
-    # Render routes public web traffic through Cloudflare, which overwrites
-    # CF-Connecting-IP with the client address. Avoid X-Forwarded-For because
-    # caller-supplied values can be retained in that header chain.
-    client_key = request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
+    client_key = _get_rate_limit_client_key()
     now = time.monotonic()
 
     with _request_history_lock:
