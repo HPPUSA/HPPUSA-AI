@@ -43,8 +43,9 @@ def _get_rate_limit_client_key():
 def _chat_rate_limit_exceeded(client_key=None):
     if client_key is None:
         client_key = _get_rate_limit_client_key()
+    # Defense in depth: an absent/invalid identity must never be treated as allowed.
     if client_key is None:
-        return False
+        return True
     now = time.monotonic()
 
     with _request_history_lock:
