@@ -13,8 +13,9 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
 # Lightweight process-local protection suitable for the initial Free-tier test.
-# Client identity is read from the Cloudflare ingress header; proxy trust remains
-# an external deployment assumption and is not established by local tests.
+# Public client identity is read from Render's Cloudflare ingress header.
+# Render confirms private-network requests bypass Cloudflare; without that header,
+# /chat intentionally fails closed rather than trusting XFF or the network peer.
 RATE_LIMIT_REQUESTS = 10
 RATE_LIMIT_WINDOW_SECONDS = 60
 MAX_TRACKED_CLIENTS = 5000
