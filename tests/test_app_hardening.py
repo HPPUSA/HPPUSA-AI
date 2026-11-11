@@ -11,7 +11,9 @@ class _CloudflareTestClient(FlaskClient):
 
     def post(self, *args, **kwargs):
         headers = dict(kwargs.pop("headers", {}) or {})
-        headers.setdefault("CF-Connecting-IP", "192.0.2.200")
+        omit_cf_header = headers.pop("TEST-OMIT-CF-HEADER", False)
+        if not omit_cf_header:
+            headers.setdefault("CF-Connecting-IP", "192.0.2.200")
         kwargs["headers"] = headers
         return super().post(*args, **kwargs)
 
@@ -365,7 +367,10 @@ def test_invalid_cloudflare_ip_header_has_no_trusted_client_key():
 def test_missing_cloudflare_ip_header_has_no_trusted_client_key():
     with App.app.test_request_context(
         "/chat",
-        headers={"X-Forwarded-For": "203.0.113.99"},
+        headers={
+            "X-Forwarded-For": "203.0.113.99",
+            "TEST-OMIT-CF-HEADER": "1",
+        },
         environ_base={"REMOTE_ADDR": "192.0.2.71"},
     ):
         assert App._get_rate_limit_client_key() is None
