@@ -21,7 +21,9 @@ _request_history_lock = Lock()
 
 
 def _chat_rate_limit_exceeded():
-    client_key = request.remote_addr or "unknown"
+    # Render routes public traffic through Cloudflare; prefer its client-IP header.
+    # Do not trust arbitrary X-Forwarded-For values supplied by callers.
+    client_key = request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
     now = time.monotonic()
 
     with _request_history_lock:
