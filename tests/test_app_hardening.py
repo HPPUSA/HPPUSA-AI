@@ -47,6 +47,16 @@ def test_homepage_returns_200():
     assert b"HPPUSA AI" in response.data
 
 
+def test_frontend_security_libraries_are_version_pinned():
+    response = App.app.test_client().get("/")
+    html = response.get_data(as_text=True)
+
+    assert "marked@18.1.3/lib/marked.umd.js" in html
+    assert "dompurify@3.4.17/dist/purify.min.js" in html
+    assert "marked.min.js" not in html
+    assert "dompurify@3.2.6" not in html
+
+
 def test_valid_chat_uses_mocked_provider(monkeypatch):
     monkeypatch.setenv("GROQ_API_KEY", "test-key-not-real")
     monkeypatch.setattr(App, "Groq", _FakeGroq)
