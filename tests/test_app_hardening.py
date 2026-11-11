@@ -1,7 +1,22 @@
 import logging
 from concurrent.futures import ThreadPoolExecutor
 
+from flask.testing import FlaskClient
+
 import App
+
+
+class _CloudflareTestClient(FlaskClient):
+    """Model the normal edge header for ordinary local endpoint tests."""
+
+    def post(self, *args, **kwargs):
+        headers = dict(kwargs.pop("headers", {}) or {})
+        headers.setdefault("CF-Connecting-IP", "192.0.2.200")
+        kwargs["headers"] = headers
+        return super().post(*args, **kwargs)
+
+
+App.app.test_client_class = _CloudflareTestClient
 
 
 class _FakeMessage:
@@ -335,7 +350,7 @@ def test_expired_client_history_is_not_swept_for_inactive_clients(monkeypatch):
 
 
 
-def test_invalid_cloudflare_ip_header_falls_back_to_socket_peer():
+def test_invalid_cloudflare_ip_header_has_no_trusted_client_key():
     with App.app.test_request_context(
         "/chat",
         headers={
@@ -344,16 +359,16 @@ def test_invalid_cloudflare_ip_header_falls_back_to_socket_peer():
         },
         environ_base={"REMOTE_ADDR": "192.0.2.70"},
     ):
-        assert App._get_rate_limit_client_key() == "192.0.2.70"
+        assert App._get_rate_limit_client_key() is None
 
 
-def test_missing_cloudflare_ip_header_uses_socket_peer():
+def test_missing_cloudflare_ip_header_has_no_trusted_client_key():
     with App.app.test_request_context(
         "/chat",
         headers={"X-Forwarded-For": "203.0.113.99"},
         environ_base={"REMOTE_ADDR": "192.0.2.71"},
     ):
-        assert App._get_rate_limit_client_key() == "192.0.2.71"
+        assert App._get_rate_limit_client_key() is None
 
 
 def test_cloudflare_ipv6_address_is_canonicalized():
@@ -363,3 +378,26 @@ def test_cloudflare_ipv6_address_is_canonicalized():
         environ_base={"REMOTE_ADDR": "10.0.0.1"},
     ):
         assert App._get_rate_limit_client_key() == "2001:db8::1"
+
+
+
+def test_chat_fails_closed_when_cloudflare_ip_header_is_missing():
+    response = App.app.test_client().post(
+        "/chat",
+        json={"message": "hello"},
+        headers={"X-Forwarded-For": "203.0.113.99"},
+    )
+    assert response.status_code == 503
+    assert response.headers["Retry-After"] == "60"
+    assert "cannot verify the request source" in response.get_json()["error"]
+
+
+def test_chat_fails_closed_when_cloudflare_ip_header_is_invalid():
+    response = App.app.test_client().post(
+        "/chat",
+        json={"message": "hello"},
+        headers={"CF-Connecting-IP": "not-an-ip, 198.51.100.1"},
+        environ_base={"REMOTE_ADDR": "192.0.2.70"},
+    )
+    assert response.status_code == 503
+    assert "cannot verify the request source" in response.get_json()["error"]
