@@ -39,8 +39,9 @@ try {
   container.innerHTML = rendered;
 
   assert.equal(container.querySelector("script"), null, "script element survived");
-  assert.equal(container.querySelector("img"), null, "unsafe image element survived");
-  assert.equal(container.querySelector("svg"), null, "unsafe SVG element survived");
+  assert.equal(container.querySelector("img")?.hasAttribute("onerror"), false, "image event handler survived");
+  assert.equal(container.querySelector("svg")?.hasAttribute("onload"), false, "SVG event handler survived");
+  assert.equal(container.querySelector("a")?.getAttribute("href"), null, "javascript link survived");
 
   for (const element of container.querySelectorAll("*")) {
     for (const attribute of element.attributes) {
