@@ -1,4 +1,5 @@
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 import App
 
@@ -229,3 +230,44 @@ def test_provider_timeout_returns_safe_error_without_exposing_details(monkeypatc
     assert "test-key-not-real" not in body
     assert response.get_json()["request_id"]
     assert "provider-timeout-internal-detail" not in caplog.text
+
+
+def test_rate_limit_expires_at_exact_window_boundary(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    now = [1000.0]
+    monkeypatch.setattr(App.time, "monotonic", lambda: now[0])
+    client = App.app.test_client()
+    address = {"REMOTE_ADDR": "192.0.2.40"}
+
+    for _ in range(App.RATE_LIMIT_REQUESTS):
+        assert client.post("/chat", json={"message": "hello"}, environ_base=address).status_code == 500
+
+    assert client.post("/chat", json={"message": "hello"}, environ_base=address).status_code == 429
+
+    now[0] = 1059.999
+    assert client.post("/chat", json={"message": "hello"}, environ_base=address).status_code == 429
+
+    now[0] = 1060.0
+    assert client.post("/chat", json={"message": "hello"}, environ_base=address).status_code == 500
+
+
+def test_rate_limit_concurrent_requests_never_exceed_ten_allowed(monkeypatch):
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    headers = {"CF-Connecting-IP": "192.0.2.41"}
+    environ = {"REMOTE_ADDR": "10.0.0.1"}
+
+    def send_request(_index):
+        with App.app.test_client() as client:
+            response = client.post(
+                "/chat",
+                json={"message": "hello"},
+                headers=headers,
+                environ_base=environ,
+            )
+            return response.status_code
+
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        statuses = list(executor.map(send_request, range(20)))
+
+    assert statuses.count(500) == App.RATE_LIMIT_REQUESTS
+    assert statuses.count(429) == 20 - App.RATE_LIMIT_REQUESTS
