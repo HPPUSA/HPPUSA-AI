@@ -242,7 +242,9 @@ def chat():
         }), 500
 
     try:
-        client = Groq(api_key=api_key)
+        # Keep provider waits below Gunicorn's default 30-second worker timeout.
+        # Disable SDK retries so one request has a predictable upper bound.
+        client = Groq(api_key=api_key, timeout=25.0, max_retries=0)
 
         completion = client.chat.completions.create(
             model="openai/gpt-oss-120b",
