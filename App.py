@@ -21,9 +21,10 @@ _request_history_lock = Lock()
 
 
 def _chat_rate_limit_exceeded():
-    # Use the WSGI peer address until the production proxy/header chain is verified.
-    # Do not trust caller-supplied X-Forwarded-For or CF-Connecting-IP headers.
-    client_key = request.remote_addr or "unknown"
+    # Render routes public web traffic through Cloudflare, which overwrites
+    # CF-Connecting-IP with the client address. Avoid X-Forwarded-For because
+    # caller-supplied values can be retained in that header chain.
+    client_key = request.headers.get("CF-Connecting-IP") or request.remote_addr or "unknown"
     now = time.monotonic()
 
     with _request_history_lock:
