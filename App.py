@@ -35,18 +35,16 @@ def _get_rate_limit_client_key():
             # Reject malformed or chained values and fail back to the socket peer.
             pass
 
-    remote_ip = request.remote_addr
-    if remote_ip:
-        try:
-            return ipaddress.ip_address(remote_ip).compressed
-        except ValueError:
-            pass
-
-    return "unknown"
+    # Fail closed: do not substitute the proxy socket address or an XFF value.
+    # Without a valid edge-supplied client identity, rate limiting is unreliable.
+    return None
 
 
-def _chat_rate_limit_exceeded():
-    client_key = _get_rate_limit_client_key()
+def _chat_rate_limit_exceeded(client_key=None):
+    if client_key is None:
+        client_key = _get_rate_limit_client_key()
+    if client_key is None:
+        return False
     now = time.monotonic()
 
     with _request_history_lock:
@@ -242,7 +240,16 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
-    if _chat_rate_limit_exceeded():
+    client_key = _get_rate_limit_client_key()
+    if client_key is None:
+        response = jsonify({
+            "error": "HPPUSA AI cannot verify the request source right now. Please try again shortly."
+        })
+        response.status_code = 503
+        response.headers["Retry-After"] = str(RATE_LIMIT_WINDOW_SECONDS)
+        return response
+
+    if _chat_rate_limit_exceeded(client_key):
         response = jsonify({"error": "Too many requests. Please wait a moment before trying again."})
         response.status_code = 429
         response.headers["Retry-After"] = str(RATE_LIMIT_WINDOW_SECONDS)
