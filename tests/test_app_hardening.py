@@ -390,7 +390,10 @@ def test_chat_fails_closed_when_cloudflare_ip_header_is_missing():
     response = App.app.test_client().post(
         "/chat",
         json={"message": "hello"},
-        headers={"X-Forwarded-For": "203.0.113.99"},
+        headers={
+            "X-Forwarded-For": "203.0.113.99",
+            "TEST-OMIT-CF-HEADER": "1",
+        },
     )
     assert response.status_code == 503
     assert response.headers["Retry-After"] == "60"
