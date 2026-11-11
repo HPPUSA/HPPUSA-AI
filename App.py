@@ -13,7 +13,8 @@ app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
 
 # Lightweight process-local protection suitable for the initial Free-tier test.
-# The client address is taken from the WSGI request, not an untrusted header.
+# Client identity is read from the Cloudflare ingress header; proxy trust remains
+# an external deployment assumption and is not established by local tests.
 RATE_LIMIT_REQUESTS = 10
 RATE_LIMIT_WINDOW_SECONDS = 60
 MAX_TRACKED_CLIENTS = 5000
@@ -25,8 +26,13 @@ def _normalize_rate_limit_client_key(client_key):
     """Return one canonical IP address, or None for an untrusted identity."""
     if not isinstance(client_key, str):
         return None
+    normalized_input = client_key.strip()
+    # Scoped IPv6 literals (for example, fe80::1%eth0) are interface-local
+    # identifiers, not suitable stable client identities for this limiter.
+    if not normalized_input or "%" in normalized_input:
+        return None
     try:
-        return ipaddress.ip_address(client_key.strip()).compressed
+        return ipaddress.ip_address(normalized_input).compressed
     except ValueError:
         return None
 
@@ -63,6 +69,9 @@ def _chat_rate_limit_exceeded(client_key=_CLIENT_KEY_UNSET):
             if len(_request_history) >= MAX_TRACKED_CLIENTS:
                 # Reclaim only expired records. Never evict an active client's
                 # history and silently grant that identity a fresh request bucket.
+                # Worst case: O(MAX_TRACKED_CLIENTS) work while holding the
+                # shared lock. This bounded scan is accepted for this initial
+                # low-volume in-process limiter; revisit before higher traffic.
                 expired_keys = []
                 for tracked_key, tracked_history in _request_history.items():
                     while tracked_history and tracked_history[0] <= cutoff:
