@@ -315,41 +315,62 @@ def test_rate_limit_identity_can_be_changed_by_spoofed_cloudflare_header(monkeyp
     assert len(App._request_history) == 11
 
 
-def test_rate_limit_tracking_capacity_evicts_oldest_key(monkeypatch):
+def test_rate_limit_capacity_preserves_active_keys_and_blocks_new_keys(monkeypatch):
     monkeypatch.setattr(App, "MAX_TRACKED_CLIENTS", 2)
     App._request_history.clear()
 
-    for address in ("192.0.2.51", "192.0.2.52", "192.0.2.53"):
+    for address in ("192.0.2.51", "192.0.2.52"):
         with App.app.test_request_context(
             "/chat", headers={"CF-Connecting-IP": address}
         ):
             assert App._chat_rate_limit_exceeded() is False
 
-    assert len(App._request_history) == 2
-    assert "192.0.2.51" not in App._request_history
-    assert list(App._request_history) == ["192.0.2.52", "192.0.2.53"]
+    with App.app.test_request_context(
+        "/chat", headers={"CF-Connecting-IP": "192.0.2.53"}
+    ):
+        assert App._chat_rate_limit_exceeded() is True
+
+    assert list(App._request_history) == ["192.0.2.51", "192.0.2.52"]
+    assert all(len(history) == 1 for history in App._request_history.values())
 
 
-def test_expired_client_history_is_not_swept_for_inactive_clients(monkeypatch):
+def test_rate_limit_capacity_reclaims_expired_records_only(monkeypatch):
+    monkeypatch.setattr(App, "MAX_TRACKED_CLIENTS", 2)
     now = [1000.0]
     monkeypatch.setattr(App.time, "monotonic", lambda: now[0])
     App._request_history.clear()
 
-    with App.app.test_request_context(
-        "/chat", headers={"CF-Connecting-IP": "192.0.2.61"}
-    ):
-        assert App._chat_rate_limit_exceeded() is False
+    for address in ("192.0.2.61", "192.0.2.62"):
+        with App.app.test_request_context(
+            "/chat", headers={"CF-Connecting-IP": address}
+        ):
+            assert App._chat_rate_limit_exceeded() is False
 
     now[0] = 1061.0
     with App.app.test_request_context(
-        "/chat", headers={"CF-Connecting-IP": "192.0.2.62"}
+        "/chat", headers={"CF-Connecting-IP": "192.0.2.63"}
     ):
         assert App._chat_rate_limit_exceeded() is False
 
-    assert "192.0.2.61" in App._request_history
-    # Only the current client's history is pruned; inactive keys remain stale.\n    assert len(App._request_history["192.0.2.61"]) == 1
+    assert list(App._request_history) == ["192.0.2.63"]
+    assert len(App._request_history) == 1
 
 
+
+
+def test_rate_limit_rejects_invalid_explicit_client_keys():
+    App._request_history.clear()
+    for invalid_key in ("not-an-ip", "192.0.2.1, 198.51.100.1", "", 123, None, ["192.0.2.1"]):
+        assert App._chat_rate_limit_exceeded(invalid_key) is True
+    assert not App._request_history
+
+
+def test_rate_limit_normalizes_explicit_ipv6_client_keys():
+    App._request_history.clear()
+    assert App._chat_rate_limit_exceeded("2001:0db8:0000:0000:0000:0000:0000:0001") is False
+    assert "2001:db8::1" in App._request_history
+    assert App._chat_rate_limit_exceeded("2001:db8::1") is False
+    assert len(App._request_history) == 1
 
 
 def test_invalid_cloudflare_ip_header_has_no_trusted_client_key():
