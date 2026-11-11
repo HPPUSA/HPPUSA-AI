@@ -21,10 +21,18 @@ python -m pytest -q
 
 If `py -3 --version` fails, install Python 3.11 or newer from python.org, then reopen PowerShell and retry.
 
-Expected success output ends with `14 passed` (current suite). If a test fails, copy the complete PowerShell output for review. Do not add a Groq API key or run the live service for this test.
+Expected Python success output ends with `14 passed` (current Python suite). The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
+
+```powershell
+npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 dompurify@3.4.17 marked@18.1.3
+node tests/frontend_xss.test.mjs
+```
+
+Do not add a Groq API key or run the live service for these tests.
 
 ## Scope
 
 - Tests run only against the extracted branch copy.
 - No Render service, production endpoint, or Payhip product is contacted.
-- The test suite uses a fake Groq client; missing-key and failure tests deliberately avoid provider calls.
+- Python tests use a fake Groq client; missing-key and failure tests deliberately avoid provider calls.
+- The frontend test loads the actual formatter from the `App.py` page template in a local simulated DOM. It checks that executable markup and unsafe links are removed while ordinary Markdown formatting and HTTPS links remain.
