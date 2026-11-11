@@ -271,3 +271,60 @@ def test_rate_limit_concurrent_requests_never_exceed_ten_allowed(monkeypatch):
 
     assert statuses.count(500) == App.RATE_LIMIT_REQUESTS
     assert statuses.count(429) == 20 - App.RATE_LIMIT_REQUESTS
+
+
+def test_rate_limit_identity_can_be_changed_by_spoofed_cloudflare_header(monkeypatch):
+    """Document current behavior: Flask accepts caller-supplied CF header in tests."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    client = App.app.test_client()
+
+    # Same WSGI peer address, but each request supplies a different claimed
+    # Cloudflare client address. All requests bypass the per-key threshold.
+    statuses = [
+        client.post(
+            "/chat",
+            json={"message": "hello"},
+            headers={"CF-Connecting-IP": f"198.51.100.{index}"},
+            environ_base={"REMOTE_ADDR": "10.0.0.1"},
+        ).status_code
+        for index in range(1, 12)
+    ]
+
+    assert statuses == [500] * 11
+    assert len(App._request_history) == 11
+
+
+def test_rate_limit_tracking_capacity_evicts_oldest_key(monkeypatch):
+    monkeypatch.setattr(App, "MAX_TRACKED_CLIENTS", 2)
+    App._request_history.clear()
+
+    for address in ("192.0.2.51", "192.0.2.52", "192.0.2.53"):
+        with App.app.test_request_context(
+            "/chat", headers={"CF-Connecting-IP": address}
+        ):
+            assert App._chat_rate_limit_exceeded() is False
+
+    assert len(App._request_history) == 2
+    assert "192.0.2.51" not in App._request_history
+    assert list(App._request_history) == ["192.0.2.52", "192.0.2.53"]
+
+
+def test_expired_client_history_is_retained_as_empty_key(monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(App.time, "monotonic", lambda: now[0])
+    App._request_history.clear()
+
+    with App.app.test_request_context(
+        "/chat", headers={"CF-Connecting-IP": "192.0.2.61"}
+    ):
+        assert App._chat_rate_limit_exceeded() is False
+
+    now[0] = 1061.0
+    with App.app.test_request_context(
+        "/chat", headers={"CF-Connecting-IP": "192.0.2.62"}
+    ):
+        assert App._chat_rate_limit_exceeded() is False
+
+    assert "192.0.2.61" in App._request_history
+    assert len(App._request_history["192.0.2.61"]) == 0
+
