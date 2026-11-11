@@ -353,6 +353,7 @@ def test_expired_client_history_is_not_swept_for_inactive_clients(monkeypatch):
 
 
 def test_invalid_cloudflare_ip_header_has_no_trusted_client_key():
+    App._request_history.clear()
     with App.app.test_request_context(
         "/chat",
         headers={
@@ -362,9 +363,12 @@ def test_invalid_cloudflare_ip_header_has_no_trusted_client_key():
         environ_base={"REMOTE_ADDR": "192.0.2.70"},
     ):
         assert App._get_rate_limit_client_key() is None
+        assert App._chat_rate_limit_exceeded() is True
+    assert not App._request_history
 
 
 def test_missing_cloudflare_ip_header_has_no_trusted_client_key():
+    App._request_history.clear()
     with App.app.test_request_context(
         "/chat",
         headers={
@@ -374,6 +378,8 @@ def test_missing_cloudflare_ip_header_has_no_trusted_client_key():
         environ_base={"REMOTE_ADDR": "192.0.2.71"},
     ):
         assert App._get_rate_limit_client_key() is None
+        assert App._chat_rate_limit_exceeded() is True
+    assert not App._request_history
 
 
 def test_cloudflare_ipv6_address_is_canonicalized():
