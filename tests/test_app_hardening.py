@@ -309,7 +309,7 @@ def test_rate_limit_tracking_capacity_evicts_oldest_key(monkeypatch):
     assert list(App._request_history) == ["192.0.2.52", "192.0.2.53"]
 
 
-def test_expired_client_history_is_retained_as_empty_key(monkeypatch):
+def test_expired_client_history_is_not_swept_for_inactive_clients(monkeypatch):
     now = [1000.0]
     monkeypatch.setattr(App.time, "monotonic", lambda: now[0])
     App._request_history.clear()
@@ -326,5 +326,5 @@ def test_expired_client_history_is_retained_as_empty_key(monkeypatch):
         assert App._chat_rate_limit_exceeded() is False
 
     assert "192.0.2.61" in App._request_history
-    assert len(App._request_history["192.0.2.61"]) == 0
+    # Only the current client's history is pruned; inactive keys remain stale.\n    assert len(App._request_history["192.0.2.61"]) == 1
 
