@@ -1,8 +1,53 @@
 
 import os
+import time
+from collections import OrderedDict, deque
+from threading import Lock
+from uuid import uuid4
+
 from flask import Flask, request, jsonify, render_template_string
 from groq import Groq
+
 app = Flask(__name__)
+app.config["MAX_CONTENT_LENGTH"] = 16 * 1024
+
+# Lightweight process-local protection suitable for the initial Free-tier test.
+# The client address is taken from the WSGI request, not an untrusted header.
+RATE_LIMIT_REQUESTS = 10
+RATE_LIMIT_WINDOW_SECONDS = 60
+MAX_TRACKED_CLIENTS = 5000
+_request_history = OrderedDict()
+_request_history_lock = Lock()
+
+
+def _chat_rate_limit_exceeded():
+    client_key = request.remote_addr or "unknown"
+    now = time.monotonic()
+
+    with _request_history_lock:
+        history = _request_history.get(client_key)
+        if history is None:
+            if len(_request_history) >= MAX_TRACKED_CLIENTS:
+                _request_history.popitem(last=False)
+            history = deque()
+            _request_history[client_key] = history
+        else:
+            _request_history.move_to_end(client_key)
+
+        cutoff = now - RATE_LIMIT_WINDOW_SECONDS
+        while history and history[0] <= cutoff:
+            history.popleft()
+
+        if len(history) >= RATE_LIMIT_REQUESTS:
+            return True
+
+        history.append(now)
+        return False
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    return jsonify({"error": "Your request is too large. Please shorten it and try again."}), 413
 
 PAGE = """
 <!DOCTYPE html>
@@ -172,6 +217,12 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    if _chat_rate_limit_exceeded():
+        response = jsonify({"error": "Too many requests. Please wait a moment before trying again."})
+        response.status_code = 429
+        response.headers["Retry-After"] = str(RATE_LIMIT_WINDOW_SECONDS)
+        return response
+
     data = request.get_json(silent=True) or {}
     message = str(data.get("message", "")).strip()
 
@@ -295,11 +346,16 @@ def chat():
         return jsonify({"reply": reply})
 
     except Exception as error:
-        print("Groq error:", repr(error), flush=True)
-        print("Groq error type:", type(error).__name__, flush=True)
-        print("Groq error cause:", repr(error.__cause__), flush=True)
+        request_id = uuid4().hex[:12]
+        # Do not log prompts, credentials, provider payloads, or raw exception text.
+        app.logger.error(
+            "Groq request failed (request_id=%s, error_type=%s)",
+            request_id,
+            type(error).__name__,
+        )
         return jsonify({
-            "error": "HPPUSA AI could not complete the request right now. Please try again."
+            "error": "HPPUSA AI could not complete the request right now. Please try again.",
+            "request_id": request_id,
         }), 500
 
 
