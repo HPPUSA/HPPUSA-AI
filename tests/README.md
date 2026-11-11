@@ -21,7 +21,7 @@ python -m pytest -q
 
 If `py -3 --version` fails, install Python 3.11 or newer from python.org, then reopen PowerShell and retry.
 
-Expected Python success output ends with `14 passed` (current Python suite). The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
+Expected Python success output ends with `16 passed` (current Python suite). The suite now includes rate-limit expiry at the exact 60-second boundary and concurrent requests sharing one client address. The separate frontend XSS test requires Node.js 22 and these exact test dependencies:
 
 ```powershell
 npm install --no-save --no-package-lock --no-audit --no-fund jsdom@26.1.0 dompurify@3.4.17 marked@18.1.3
