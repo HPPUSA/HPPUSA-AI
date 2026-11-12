@@ -10,6 +10,34 @@ permissions:
   contents: read
 
 jobs:
+  resolve-node-dependencies:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out isolated branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: "22"
+
+      - name: Generate complete lockfile from pinned manifest
+        run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Validate lockfile with clean installation
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ls --depth=0
+
+      - name: Upload generated lockfile for review (not committed)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hppusa-node-lockfile-review
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 7
+
   regression-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 10
