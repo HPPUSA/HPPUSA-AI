@@ -1,0 +1,19 @@
+{
+  "name": "hppusa-ai-security-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pinned, isolated frontend security test dependencies for HPPUSA-AI",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test:frontend:unit": "node tests/frontend_xss.test.mjs",
+    "test:frontend:browser": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.65.0",
+    "dompurify": "3.4.17",
+    "jsdom": "26.1.0",
+    "marked": "18.1.3"
+  }
+}
