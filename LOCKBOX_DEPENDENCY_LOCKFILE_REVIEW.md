@@ -26,7 +26,14 @@ Review date: 2026-11-22
 - The one-time import workflow was removed after the successful import.
 - The ongoing Phase 1 CI workflow was updated to validate the committed lockfile with a clean installation and ensure the lockfile remains unchanged.
 
+## Browser-level frontend validation
+- Added a Playwright Chromium test suite for the actual Flask-rendered HPPUSA-AI page.
+- Tests verify the page shell and frontend libraries load; active HTML, event-handler attributes and JavaScript links are blocked; safe Markdown formatting and HTTPS links remain usable; empty input is validated; and a mocked chat reply is rendered safely.
+- The tests intercept the pinned CDN script URLs and serve the exact versions installed from the lockfile. The browser test uses a local Flask server and mocked responses; it makes no Groq API call and does not contact the live service.
+- Latest full isolated CI run: https://github.com/HPPUSA/HPPUSA-AI/actions/runs/45081578024 — all six jobs passed: lockfile install, frontend jsdom XSS tests, browser-level Playwright tests, and Python/Gunicorn checks on Python 3.11, 3.13 and 3.14.8.
+
 ## Scope and status
 - This is an isolated-branch change only.
 - No merge to `main`, production configuration change, Render change, Cloudflare change, production secret change, or deployment was performed.
-- The branch remains subject to the separate LockBox release-readiness review. A passing dependency-lockfile check does not approve production rollout.
+- At the latest check, the isolated branch was 68 commits ahead of `main`, zero behind. The branch remains unprotected.
+- The branch remains subject to the separate LockBox release-readiness review. Passing automated checks do not approve production rollout.
