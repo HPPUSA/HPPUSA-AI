@@ -102,6 +102,20 @@ def _chat_rate_limit_exceeded(client_key=_CLIENT_KEY_UNSET):
         return False
 
 
+@app.after_request
+def add_security_headers(response):
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    response.headers.setdefault(
+        "Permissions-Policy",
+        "camera=(), microphone=(), geolocation=()",
+    )
+    if request.path == "/chat":
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @app.errorhandler(413)
 def request_too_large(_error):
     return jsonify({"error": "Your request is too large. Please shorten it and try again."}), 413
