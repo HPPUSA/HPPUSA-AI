@@ -1,4 +1,5 @@
 
+import hmac
 import ipaddress
 import os
 import time
@@ -273,6 +274,22 @@ def home():
 
 @app.route("/chat", methods=["POST"])
 def chat():
+    # The public Render origin can be reached directly, bypassing Cloudflare.
+    # Require a high-entropy shared secret injected by a Cloudflare request
+    # header transform rule. Never trust CF-Connecting-IP by itself as proof
+    # that the request passed through Cloudflare.
+    expected_origin_token = os.environ.get("HPPUSA_ORIGIN_AUTH_TOKEN", "")
+    supplied_origin_token = request.headers.get("X-HPPUSA-Origin-Auth", "")
+    if not expected_origin_token:
+        return jsonify({
+            "error": "HPPUSA AI is temporarily unavailable. Please try again shortly."
+        }), 503
+    if not supplied_origin_token or not hmac.compare_digest(
+        supplied_origin_token.encode("utf-8"),
+        expected_origin_token.encode("utf-8"),
+    ):
+        return jsonify({"error": "Request source is not authorized."}), 403
+
     client_key = _get_rate_limit_client_key()
     if client_key is None:
         response = jsonify({
