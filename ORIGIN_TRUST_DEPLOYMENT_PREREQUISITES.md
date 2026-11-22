@@ -104,3 +104,13 @@ If the Cloudflare rule or Render environment is incomplete, do not deploy the is
 - Latest complete five-job CI run at this checkpoint: https://github.com/HPPUSA/HPPUSA-AI/actions/runs/45081369681 — all five jobs passed, including the lockfile installation check, frontend XSS tests, and Python/Gunicorn tests on Python 3.11, 3.13 and 3.14.8.
 - Branch head at the time of this record: `2d5afde225fabf66d3bd51646d823eb229c9deac`. The isolated branch is 65 commits ahead of `main`, zero behind. No merge to `main`.
 - No Render settings, Cloudflare rules, production secrets, live deployment, or live request tests were changed or performed.
+
+## 10. Baseline HTTP response headers and latest isolated CI — 2026-11-22
+
+- Added baseline response headers in isolated `App.py`: `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a restrictive `Permissions-Policy` disabling camera, microphone, and geolocation.
+- Added `Cache-Control: no-store` to `/chat` responses to reduce the chance of sensitive request responses being stored by caches.
+- Added regression coverage for the headers on both the homepage and `/chat`. Python suite result on run #67: 31 passed on Python 3.11, 3.13, and 3.14.8.
+- The frontend XSS suite, Playwright browser suite (3 tests), lockfile validation, and all Python/Gunicorn jobs passed in run #67: https://github.com/HPPUSA/HPPUSA-AI/actions/runs/45085704135
+- This is not a full Content Security Policy. No CSP or HSTS header was added: CSP needs a deliberate plan for the current inline scripts/styles and external CDN assets; HSTS should be evaluated at the verified HTTPS edge. These are separate review items, not silently assumed controls.
+- Current isolated branch head after this CI-tested code change: `8bd8ee11ae9501436bf951c4c184300472676b78`. Follow-up documentation-only commits may move the branch head and trigger another CI run.
+- No production settings, Render configuration, Cloudflare rules, secrets, deployment, or main-branch changes were made.
