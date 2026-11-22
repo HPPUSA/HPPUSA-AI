@@ -9,7 +9,7 @@ The isolated application now requires both:
 1. A valid `X-HPPUSA-Origin-Auth` request header whose value matches the server-side `HPPUSA_ORIGIN_AUTH_TOKEN` environment variable; and
 2. A syntactically valid `CF-Connecting-IP` address for the application rate limiter.
 
-The token comparison uses constant-time `hmac.compare_digest`. If the Render environment variable is absent, `/chat` fails closed with HTTP 503. If the header is absent or incorrect, `/chat` returns HTTP 403. No token value is included in source code, responses, logs, or this document.
+The production token comparison uses constant-time `hmac.compare_digest`. If the Render environment variable is absent, `/chat` fails closed with HTTP 503. If the header is absent or incorrect, `/chat` returns HTTP 403. No production token value is included in source code, responses, logs, or this document. The isolated test harness and CI workflow contain a clearly test-only placeholder value; it is not a production credential and must never be reused in Cloudflare or Render.
 
 This is an origin-authentication control, not proof of a complete network-level private origin. The Render public web service and homepage remain publicly reachable. The protected resource is the `/chat` endpoint.
 
@@ -81,3 +81,15 @@ If the Cloudflare rule or Render environment is incomplete, do not deploy the is
 - The token is not generated or stored in this repository.
 - This design does not hide the public Render hostname or protect the homepage from direct viewing; it prevents unauthenticated direct-origin access to `/chat` if configured correctly.
 - This is not a substitute for WAF rules, DDoS protection, distributed rate limiting, secret rotation procedures, or independent security testing.
+
+
+## 8. Isolated implementation and CI update — 2026-11-22
+
+- Added the shared-origin-token gate to the isolated `App.py` branch only.
+- Added unit tests for missing and incorrect origin tokens.
+- Updated the isolated workflow's localhost Gunicorn smoke test to supply a CI-only placeholder token.
+- Added this deployment-prerequisites document.
+- Latest isolated workflow run #53 completed successfully: five of five jobs passed. Python regression suite: 30 passed on each of Python 3.11, 3.13 and 3.14.8 (90 test executions across the matrix). Frontend XSS suite passed. Node dependency lockfile generation and clean `npm ci` validation passed.
+- The workflow generated a temporary review artifact; it is not committed to the branch. Artifact ID: `14769741639`, ZIP SHA-256: `60b458466317cb5e3cc5c7455c57870e924219b3e4b6daa5c96a72be874497bb`. The extracted `package-lock.json` has 45 dependency entries, all with `resolved` and `integrity` fields; SHA-256: `53cc60cdefd03ad270a8c3b1a84c883b78cfe6e42712bf7bb949b35ed10fe80a`. The artifact expires 2026-11-29.
+- Two earlier runs (#51 and #52) failed during the sequential code/workflow update because they ran against intermediate commits with mismatched test/CI token configuration. The final run #53 passed after the workflow and tests were aligned. Do not count the intermediate failures as current unresolved failures, but retain them in the audit trail.
+- No Cloudflare rule, Render environment variable, live request, merge, production setting change, or deployment was performed.
