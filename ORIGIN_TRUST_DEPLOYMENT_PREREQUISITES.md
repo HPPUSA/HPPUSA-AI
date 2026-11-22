@@ -82,14 +82,25 @@ If the Cloudflare rule or Render environment is incomplete, do not deploy the is
 - This design does not hide the public Render hostname or protect the homepage from direct viewing; it prevents unauthenticated direct-origin access to `/chat` if configured correctly.
 - This is not a substitute for WAF rules, DDoS protection, distributed rate limiting, secret rotation procedures, or independent security testing.
 
-
 ## 8. Isolated implementation and CI update — 2026-11-22
 
 - Added the shared-origin-token gate to the isolated `App.py` branch only.
 - Added unit tests for missing and incorrect origin tokens.
 - Updated the isolated workflow's localhost Gunicorn smoke test to supply a CI-only placeholder token.
 - Added this deployment-prerequisites document.
-- Latest isolated workflow run #53 completed successfully: five of five jobs passed. Python regression suite: 30 passed on each of Python 3.11, 3.13 and 3.14.8 (90 test executions across the matrix). Frontend XSS suite passed. Node dependency lockfile generation and clean `npm ci` validation passed.
-- The workflow generated a temporary review artifact; it is not committed to the branch. Artifact ID: `14769741639`, ZIP SHA-256: `60b458466317cb5e3cc5c7455c57870e924219b3e4b6daa5c96a72be874497bb`. The extracted `package-lock.json` has 45 dependency entries, all with `resolved` and `integrity` fields; SHA-256: `53cc60cdefd03ad270a8c3b1a84c883b78cfe6e42712bf7bb949b35ed10fe80a`. The artifact expires 2026-11-29.
-- Two earlier runs (#51 and #52) failed during the sequential code/workflow update because they ran against intermediate commits with mismatched test/CI token configuration. The final run #53 passed after the workflow and tests were aligned. Do not count the intermediate failures as current unresolved failures, but retain them in the audit trail.
+- Earlier isolated run #55 completed successfully: five of five jobs passed. The Python regression suite passed on Python 3.11, 3.13 and 3.14.8; the frontend XSS suite passed.
+- The initial workflow generated a temporary review artifact. That artifact was later imported exactly and committed; see Section 9.
+- Two earlier runs (#51 and #52) failed during sequential code/workflow updates because they ran against intermediate commits with mismatched test/CI token configuration. The final aligned run passed. Retain those failures in the audit trail; they are not the current branch's latest test result.
 - No Cloudflare rule, Render environment variable, live request, merge, production setting change, or deployment was performed.
+
+## 9. Lockfile committed and CI validation — 2026-11-22
+
+- Exact source artifact: `hppusa-node-lockfile-review`, artifact ID `14769514862`, from workflow run `45062444050`.
+- Artifact ZIP SHA-256: `8caffd4b1664446b1cfe0956aa90f14d7d20cae5543cc5dbcfec52ab3ff27bba`.
+- Extracted `package-lock.json` SHA-256: `53cc60cdefd03ad270a8c3b1a84c883b78cfe6e42712bf7bb949b35ed10fe80a`.
+- The lockfile was committed exactly to `orchestra/phase1-hardening`; the import workflow verified the hash, ran `npm ci --ignore-scripts --no-audit --no-fund`, and ran `npm ls --depth=0` successfully. Import run: https://github.com/HPPUSA/HPPUSA-AI/actions/runs/45081256991
+- The one-time import workflow was removed after the successful commit.
+- The regular Phase 1 workflow now validates the committed lockfile using `npm ci`, `npm ls --depth=0`, and `git diff --exit-code -- package-lock.json`; it no longer generates an uncommitted artifact.
+- Latest complete five-job CI run at this checkpoint: https://github.com/HPPUSA/HPPUSA-AI/actions/runs/45081369681 — all five jobs passed, including the lockfile installation check, frontend XSS tests, and Python/Gunicorn tests on Python 3.11, 3.13 and 3.14.8.
+- Branch head at the time of this record: `2d5afde225fabf66d3bd51646d823eb229c9deac`. The isolated branch is 65 commits ahead of `main`, zero behind. No merge to `main`.
+- No Render settings, Cloudflare rules, production secrets, live deployment, or live request tests were changed or performed.
