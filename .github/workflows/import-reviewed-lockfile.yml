@@ -1,0 +1,56 @@
+name: Import reviewed LockBox dependency artifact (one-time)
+
+on:
+  push:
+    branches:
+      - orchestra/phase1-hardening
+
+permissions:
+  contents: read
+
+jobs:
+  import-reviewed-lockfile:
+    if: github.ref == 'refs/heads/orchestra/phase1-hardening'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - name: Check out isolated branch
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Download the exact reviewed artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: hppusa-node-lockfile-review
+          repository: ${{ github.repository }}
+          run-id: 45062444050
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/reviewed-lockfile
+
+      - name: Verify, install, and commit only the reviewed lockfile
+        env:
+          EXPECTED_SHA256: 53cc60cdefd03ad270a8c3b1a84c883b78cfe6e42712bf7bb949b35ed10fe80a
+        run: |
+          set -euo pipefail
+          test -f /tmp/reviewed-lockfile/package-lock.json
+          ACTUAL_SHA256="$(sha256sum /tmp/reviewed-lockfile/package-lock.json | cut -d ' ' -f1)"
+          test "$ACTUAL_SHA256" = "$EXPECTED_SHA256"
+
+          if test -f package-lock.json; then
+            EXISTING_SHA256="$(sha256sum package-lock.json | cut -d ' ' -f1)"
+            test "$EXISTING_SHA256" = "$EXPECTED_SHA256"
+            echo "The exact reviewed lockfile is already committed; no write needed."
+            exit 0
+          fi
+
+          cp /tmp/reviewed-lockfile/package-lock.json ./package-lock.json
+          test "$(sha256sum package-lock.json | cut -d ' ' -f1)" = "$EXPECTED_SHA256"
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ls --depth=0
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- package-lock.json
+          git commit -m "Add reviewed frontend dependency lockfile"
+          git push origin HEAD:refs/heads/orchestra/phase1-hardening
