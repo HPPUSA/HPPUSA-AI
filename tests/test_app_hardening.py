@@ -91,6 +91,25 @@ def test_chat_rejects_incorrect_origin_secret(monkeypatch):
     assert "not authorized" in response.get_json()["error"].lower()
 
 
+def test_security_headers_are_present_on_homepage_and_chat():
+    homepage = App.app.test_client().get("/")
+    assert homepage.headers["X-Content-Type-Options"] == "nosniff"
+    assert homepage.headers["X-Frame-Options"] == "DENY"
+    assert homepage.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert homepage.headers["Permissions-Policy"] == (
+        "camera=(), microphone=(), geolocation=()"
+    )
+
+    chat = App.app.test_client().post("/chat", json={"message": "hello"})
+    assert chat.headers["X-Content-Type-Options"] == "nosniff"
+    assert chat.headers["X-Frame-Options"] == "DENY"
+    assert chat.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    assert chat.headers["Permissions-Policy"] == (
+        "camera=(), microphone=(), geolocation=()"
+    )
+    assert chat.headers["Cache-Control"] == "no-store"
+
+
 def test_homepage_returns_200():
     response = App.app.test_client().get("/")
     assert response.status_code == 200
