@@ -1,9 +1,13 @@
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor
 
 from flask.testing import FlaskClient
 
 import App
+
+# Test-only value; never use this value in Render or Cloudflare configuration.
+os.environ.setdefault("HPPUSA_ORIGIN_AUTH_TOKEN", "orchestra-test-only-origin-token")
 
 
 class _CloudflareTestClient(FlaskClient):
@@ -12,8 +16,11 @@ class _CloudflareTestClient(FlaskClient):
     def post(self, *args, **kwargs):
         headers = dict(kwargs.pop("headers", {}) or {})
         omit_cf_header = headers.pop("TEST-OMIT-CF-HEADER", False)
+        omit_origin_token = headers.pop("TEST-OMIT-ORIGIN-TOKEN", False)
         if not omit_cf_header:
             headers.setdefault("CF-Connecting-IP", "192.0.2.200")
+        if not omit_origin_token:
+            headers.setdefault("X-HPPUSA-Origin-Auth", "orchestra-test-only-origin-token")
         kwargs["headers"] = headers
         return super().post(*args, **kwargs)
 
@@ -57,6 +64,31 @@ class _FakeGroq:
 
 def setup_function():
     App._request_history.clear()
+
+
+def test_chat_rejects_direct_origin_without_shared_secret(monkeypatch):
+    monkeypatch.delenv("HPPUSA_ORIGIN_AUTH_TOKEN", raising=False)
+    response = App.app.test_client().post(
+        "/chat",
+        json={"message": "hello"},
+        headers={
+            "CF-Connecting-IP": "198.51.100.88",
+            "TEST-OMIT-ORIGIN-TOKEN": True,
+        },
+    )
+    assert response.status_code == 503
+    assert "temporarily unavailable" in response.get_json()["error"].lower()
+
+
+def test_chat_rejects_incorrect_origin_secret(monkeypatch):
+    monkeypatch.setenv("HPPUSA_ORIGIN_AUTH_TOKEN", "expected-test-only-token")
+    response = App.app.test_client().post(
+        "/chat",
+        json={"message": "hello"},
+        headers={"X-HPPUSA-Origin-Auth": "incorrect-token"},
+    )
+    assert response.status_code == 403
+    assert "not authorized" in response.get_json()["error"].lower()
 
 
 def test_homepage_returns_200():
@@ -291,10 +323,10 @@ def test_rate_limit_concurrent_requests_never_exceed_ten_allowed(monkeypatch):
 
 
 def test_rate_limit_identity_can_be_changed_by_spoofed_cloudflare_header(monkeypatch):
-    """A local Flask test client bypasses Cloudflare and can set this header.
+    """An origin-authenticated request can still supply a test IP header.
 
-    This demonstrates the test-server boundary only; it is not evidence that
-    a public Render caller can override Cloudflare's edge-supplied header.
+    The shared origin token is required separately; this test only exercises
+    client-IP selection after the origin authentication gate has passed.
     """
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
     client = App.app.test_client()
