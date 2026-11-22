@@ -67,6 +67,7 @@ jobs:
       - name: Smoke-test Gunicorn over localhost
         env:
           GROQ_API_KEY: ""
+          HPPUSA_ORIGIN_AUTH_TOKEN: "orchestra-ci-only-origin-token"
         run: |
           set -e
           gunicorn --bind 127.0.0.1:8765 --workers 1 --timeout 30 App:app &
@@ -99,6 +100,7 @@ jobs:
               headers={
               "Content-Type": "application/json",
               "CF-Connecting-IP": "192.0.2.100",
+              "X-HPPUSA-Origin-Auth": "orchestra-ci-only-origin-token",
           },
               method="POST",
           )
